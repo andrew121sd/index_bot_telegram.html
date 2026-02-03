@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Calculator</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { margin: 0; background-color: var(--tg-theme-bg-color, #1c1c1e); color: var(--tg-theme-text-color, #fff); font-family: sans-serif; overflow: hidden; }
+        #viewer { width: 100vw; height: 60vh; background: #333; }
+        .controls { padding: 15px; height: 40vh; box-sizing: border-box; background: var(--tg-theme-secondary-bg-color, #2c2c2e); border-top-left-radius: 20px; border-top-right-radius: 20px; position: relative; top: -20px; }
+        input[type="file"] { display: none; }
+        .btn { display: block; width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-primary { background-color: var(--tg-theme-button-color, #3390ec); color: var(--tg-theme-button-text-color, #fff); }
+        .btn-outline { border: 2px solid var(--tg-theme-button-color, #3390ec); color: var(--tg-theme-button-color, #3390ec); background: transparent; }
+        #stats { margin-top: 10px; font-size: 14px; line-height: 1.6; }
+    </style>
+</head>
+<body>
+
+    <div id="viewer"></div>
+
+    <div class="controls">
+        <label for="file-upload" class="btn btn-outline">📂 Завантажити STL</label>
+        <input type="file" id="file-upload" accept=".stl">
+        
+        <div id="stats">
+            📦 Об'єм: <span id="vol">0</span> см³<br>
+            ⚖️ Вага (PLA): <span id="weight">0</span> г<br>
+            💰 Ціна: <b><span id="price">0</span> грн</b>
+        </div>
+
+        <button id="order-btn" class="btn btn-primary" style="display:none;" onclick="sendOrder()">✅ Замовити</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.126.0/build/three.module.js';
+        import { OrbitControls } from 'https://unpkg.com/three@0.126.0/examples/jsm/controls/OrbitControls.js';
+        import { STLLoader } from 'https://unpkg.com/three@0.126.0/examples/jsm/loaders/STLLoader.js';
+
+        let scene, camera, renderer, mesh, controls;
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Розгорнути на весь екран
+
+        init();
+
+        function init() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x333333);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight * 0.6), 1, 1000);
+            camera.position.set(100, 100, 200);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight * 0.6);
+            document.getElementById('viewer').appendChild(renderer.domElement);
+
+            // Lights
+            const light = new THREE.HemisphereLight(0xffffff, 0x444444);
+            light.position.set(0, 20, 0);
+            scene.add(light);
+            const dirLight = new THREE.DirectionalLight(0xffffff);
+            dirLight.position.set(0, 10, 10);
+            scene.add(dirLight);
+
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // File Upload Logic
+        document.getElementById('file-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const loader = new STLLoader();
+                const geometry = loader.parse(event.target.result);
+                
+                if (mesh) scene.remove(mesh); // Remove old model
+
+                // Material
+                const material = new THREE.MeshPhongMaterial({ color: 0x3390ec, specular: 0x111111, shininess: 200 });
+                mesh = new THREE.Mesh(geometry, material);
+                
+                // Center and Scale logic
+                geometry.computeBoundingBox();
+                geometry.center();
+                
+                // Auto-fit camera
+                const maxDim = Math.max(
+                    geometry.boundingBox.max.x - geometry.boundingBox.min.x,
+                    geometry.boundingBox.max.y - geometry.boundingBox.min.y,
+                    geometry.boundingBox.max.z - geometry.boundingBox.min.z
+                );
+                camera.position.z = maxDim * 2;
+                
+                scene.add(mesh);
+                calculateStats(geometry);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function calculateStats(geometry) {
+            // Volume Calc (Signed Triangle Volume)
+            let vol = 0;
+            const pos = geometry.attributes.position;
+            const p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), p3 = new THREE.Vector3();
+            for (let i = 0; i < pos.count; i += 3) {
+                p1.fromBufferAttribute(pos, i);
+                p2.fromBufferAttribute(pos, i + 1);
+                p3.fromBufferAttribute(pos, i + 2);
+                vol += p1.dot(p2.cross(p3)) / 6.0;
+            }
+            vol = Math.abs(vol) / 1000; // mm3 -> cm3
+
+            const weight = vol * 1.24; // PLA density
+            let price = weight * 3.5; // 3.5 UAH/gram
+            if (price < 50) price = 50; // Min price
+
+            document.getElementById('vol').innerText = vol.toFixed(2);
+            document.getElementById('weight').innerText = weight.toFixed(1);
+            document.getElementById('price').innerText = Math.round(price);
+            
+            document.getElementById('order-btn').style.display = 'block';
+
+            // Store data for sending
+            window.orderData = { vol: vol.toFixed(2), weight: weight.toFixed(1), price: Math.round(price) };
+        }
+
+        window.sendOrder = function() {
+            if (window.orderData) {
+                // Send data back to Telegram Bot
+                tg.sendData(JSON.stringify(window.orderData));
+            }
+        };
+    </script>
+</body>
+</html>
