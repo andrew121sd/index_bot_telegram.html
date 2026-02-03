@@ -12,54 +12,44 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f2f2f7; color: #000; }
         
-        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 55vh; z-index: 1; background: #e5e5ea; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 50vh; z-index: 1; background: #e5e5ea; }
         
         #ui-layer { 
-            position: absolute; top: 55vh; left: 0; width: 100%; height: 45vh; z-index: 10; 
+            position: absolute; top: 50vh; left: 0; width: 100%; height: 50vh; z-index: 10; 
             background: white; border-top-left-radius: 20px; border-top-right-radius: 20px;
             box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
             display: flex; flex-direction: column; padding: 20px; overflow-y: auto;
         }
 
-        /* Ціна та Інфо */
-        .header-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .header-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .price-big { font-size: 28px; font-weight: 800; color: #007aff; }
         .stats-small { font-size: 13px; color: #8e8e93; text-align: right; }
 
-        /* Сітка налаштувань */
-        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         .control-group { display: flex; flex-direction: column; }
-        .label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8e8e93; margin-bottom: 4px; letter-spacing: 0.5px; }
+        .label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8e8e93; margin-bottom: 4px; }
         
         select {
-            width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #c7c7cc;
-            background: #f2f2f7; font-size: 15px; font-weight: 500; appearance: none;
-            color: #000; outline: none;
+            width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #c7c7cc;
+            background: #f2f2f7; font-size: 14px; font-weight: 500; appearance: none; outline: none;
         }
-        select:focus { border-color: #007aff; }
 
-        /* Кнопки */
-        .btn-container { margin-top: auto; }
+        .btn-container { margin-top: auto; padding-top: 10px; }
         .btn { 
             display: flex; justify-content: center; align-items: center; width: 100%; 
-            padding: 16px; border: none; border-radius: 14px; 
-            font-size: 17px; font-weight: 600; cursor: pointer; 
-            transition: 0.1s; margin-top: 8px;
+            padding: 14px; border: none; border-radius: 14px; 
+            font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px;
         }
-        .btn:active { transform: scale(0.98); opacity: 0.8; }
-        
+        .btn:active { opacity: 0.8; transform: scale(0.98); }
         .btn-main { background: #007aff; color: white; }
         .btn-sec { background: #e5e5ea; color: #007aff; }
-        .btn-loading { background: #8e8e93; color: white; pointer-events: none; }
-
-        /* Завантажувач та стартовий екран */
+        
         #upload-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(255,255,255,0.9); z-index: 20;
+            background: rgba(255,255,255,0.95); z-index: 20;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
-        #loader { display: none; font-weight: 600; color: #007aff; margin-top: 10px; }
-        
+        #loader { display: none; margin-top: 10px; font-weight: 600; color: #007aff; }
         input[type="file"] { display: none; }
     </style>
 </head>
@@ -105,24 +95,24 @@
                 </select>
             </div>
             <div class="control-group">
-                <span class="label">Якість (Шар)</span>
+                <span class="label">Якість</span>
                 <select id="quality">
-                    <option value="0.2">0.2 мм (Norm)</option>
-                    <option value="0.1">0.1 мм (High)</option>
-                    <option value="0.3">0.3 мм (Draft)</option>
+                    <option value="0.2">0.2 мм (Стандарт)</option>
+                    <option value="0.1">0.1 мм (Висока)</option>
+                    <option value="0.3">0.3 мм (Швидка)</option>
                 </select>
             </div>
         </div>
 
         <div class="btn-container">
-            <button class="btn btn-main" id="confirm-btn" onclick="uploadAndClose()">✅ Замовити друк</button>
-            <label for="file-upload" class="btn btn-sec">🔄 Завантажити інший файл</label>
+            <button class="btn btn-main" id="confirm-btn">✅ Замовити друк</button>
+            <label for="file-upload" class="btn btn-sec">🔄 Інший файл</label>
         </div>
     </div>
 
     <div id="upload-overlay">
-        <label for="file-upload" class="btn btn-main" style="width: 200px;">📂 Обрати файл</label>
-        <div id="loader">⏳ Обробка моделі...</div>
+        <label for="file-upload" class="btn btn-main" style="width: 200px;">📂 Відкрити файл</label>
+        <div id="loader">⏳ Обробка...</div>
     </div>
     <input type="file" id="file-upload" accept=".stl,.obj">
 
@@ -140,44 +130,40 @@
         let selectedFile = null;
         let orderData = {};
 
-        // Слухаємо зміни у всіх селекторах
-        document.querySelectorAll('select').forEach(el => {
-            el.addEventListener('change', calculatePrice);
-        });
-
+        // Ініціалізація
         init();
+
+        // Слухачі подій для перерахунку ціни (ВАЖЛИВО!)
+        document.getElementById('material').addEventListener('change', calculatePrice);
+        document.getElementById('infill').addEventListener('change', calculatePrice);
+        document.getElementById('quality').addEventListener('change', calculatePrice);
+        document.getElementById('color').addEventListener('change', updateData);
+        document.getElementById('confirm-btn').addEventListener('click', uploadAndClose);
 
         function init() {
             const container = document.getElementById('canvas-container');
             scene = new THREE.Scene(); scene.background = new THREE.Color(0xe5e5ea);
-            
-            // Світло
             scene.add(new THREE.AmbientLight(0xffffff, 0.7));
             const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(10, 10, 10);
-            scene.add(dirLight);
+            dirLight.position.set(10, 20, 10); scene.add(dirLight);
 
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight * 0.55), 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight * 0.5), 0.1, 1000);
             camera.position.set(50, 50, 50);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight * 0.55);
+            renderer.setSize(window.innerWidth, window.innerHeight * 0.5);
             container.appendChild(renderer.domElement);
 
             const controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.autoRotate = true;
+            controls.enableDamping = true; controls.autoRotate = true;
 
             animate();
-            
             function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
         }
 
-        // Завантаження файлу
         document.getElementById('file-upload').addEventListener('change', function(e) {
             selectedFile = e.target.files[0];
             if (!selectedFile) return;
-
             document.getElementById('loader').style.display = 'block';
             
             const reader = new FileReader();
@@ -187,142 +173,125 @@
                 try {
                     if (mesh) scene.remove(mesh);
                     const content = event.target.result;
-                    
-                    if (ext === 'stl') {
-                        const geometry = new STLLoader().parse(content);
-                        showModel(geometry);
-                    } else if (ext === 'obj') {
-                        const object = new OBJLoader().parse(content);
-                        let geometry = null;
-                        object.traverse(child => { if (child.isMesh) geometry = child.geometry; });
-                        if (geometry) showModel(geometry);
+                    if (ext === 'stl') showModel(new STLLoader().parse(content));
+                    else if (ext === 'obj') {
+                        const obj = new OBJLoader().parse(content);
+                        let geo; obj.traverse(c => { if(c.isMesh) geo = c.geometry });
+                        if(geo) showModel(geo);
                     }
-                } catch (err) { alert('Помилка: ' + err); }
+                } catch (err) { alert('Err: ' + err); }
                 document.getElementById('loader').style.display = 'none';
             };
-
             if (ext === 'stl') reader.readAsArrayBuffer(selectedFile); else reader.readAsText(selectedFile);
         });
 
         function showModel(geometry) {
             geometry.computeBoundingBox(); geometry.center();
-            
-            // Матеріал моделі
             const material = new THREE.MeshStandardMaterial({ color: 0x007aff, roughness: 0.5 });
             mesh = new THREE.Mesh(geometry, material);
             mesh.rotation.x = -Math.PI / 2;
             
-            // Ставимо на "підлогу"
             geometry.computeBoundingBox();
+            const maxDim = Math.max(geometry.boundingBox.max.x, geometry.boundingBox.max.y, geometry.boundingBox.max.z);
             mesh.position.y = -geometry.boundingBox.min.z;
             scene.add(mesh);
-
-            // Камера
-            const size = geometry.boundingBox.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-            camera.position.set(maxDim*2, maxDim*2, maxDim*2);
-            camera.lookAt(0,0,0);
-
-            // Об'єм
-            baseVolume = getVolume(geometry);
             
-            // Показуємо інтерфейс
+            camera.position.set(maxDim*2.5, maxDim*2.5, maxDim*2.5); camera.lookAt(0,0,0);
+
+            // Volume Calculation
+            let vol = 0; const pos = geometry.attributes.position;
+            const p1=new THREE.Vector3(),p2=new THREE.Vector3(),p3=new THREE.Vector3();
+            for(let i=0;i<pos.count;i+=3){
+                p1.fromBufferAttribute(pos,i); p2.fromBufferAttribute(pos,i+1); p3.fromBufferAttribute(pos,i+2);
+                vol += p1.dot(p2.cross(p3))/6.0;
+            }
+            baseVolume = Math.abs(vol)/1000;
+
             document.getElementById('upload-overlay').style.display = 'none';
             document.getElementById('ui-layer').style.display = 'flex';
-            
             calculatePrice();
-        }
-
-        function getVolume(geometry) {
-            let vol = 0; const pos = geometry.attributes.position;
-            const p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), p3 = new THREE.Vector3();
-            for(let i=0; i<pos.count; i+=3) {
-                p1.fromBufferAttribute(pos, i); p2.fromBufferAttribute(pos, i+1); p3.fromBufferAttribute(pos, i+2);
-                vol += p1.dot(p2.cross(p3)) / 6.0;
-            }
-            return Math.abs(vol) / 1000; // см3
         }
 
         function calculatePrice() {
             if (!baseVolume) return;
 
-            const matSelect = document.getElementById('material');
-            const infillVal = parseInt(document.getElementById('infill').value);
-            const qualityVal = parseFloat(document.getElementById('quality').value);
+            const matEl = document.getElementById('material');
+            const infillEl = document.getElementById('infill');
+            const qualEl = document.getElementById('quality');
 
-            // Дані з опцій
-            const costPerGram = parseFloat(matSelect.options[matSelect.selectedIndex].getAttribute('data-cost'));
-            const density = parseFloat(matSelect.options[matSelect.selectedIndex].getAttribute('data-dens'));
+            // Отримуємо дані з data-attributes
+            const costPerGram = parseFloat(matEl.options[matEl.selectedIndex].dataset.cost);
+            const density = parseFloat(matEl.options[matEl.selectedIndex].dataset.dens);
+            const infillVal = parseInt(infillEl.value);
+            const layerHeight = parseFloat(qualEl.value);
 
-            // 1. Розрахунок ваги з урахуванням заповнення
-            // Стінки займають ~40%, решта 60% залежать від % заповнення
-            let solidFactor = 0.4 + (0.6 * (infillVal / 100));
-            if (infillVal === 0) solidFactor = 0.3; // Тільки стінки
-            if (infillVal === 100) solidFactor = 1.0;
+            // 1. Вага (залежить від заповнення)
+            // 40% ваги - це периметри (стінки), 60% - це внутрішнє заповнення
+            let solidRatio = 0.4 + (0.6 * (infillVal / 100));
+            if (infillVal === 0) solidRatio = 0.35; 
+            if (infillVal === 100) solidRatio = 1.0;
 
-            const finalWeight = baseVolume * density * solidFactor;
+            const finalWeight = baseVolume * density * solidRatio;
 
             // 2. Ціна
             let finalPrice = finalWeight * costPerGram;
 
             // 3. Коефіцієнт якості (часу)
-            // Тонший шар (0.1) = довше = дорожче (x1.5)
-            // Товстий шар (0.3) = швидше = дешевше (x0.9)
             let qualityFactor = 1.0;
-            if (qualityVal === 0.1) qualityFactor = 1.5;
-            if (qualityVal === 0.3) qualityFactor = 0.9;
+            if (layerHeight === 0.1) qualityFactor = 1.5; // Довго
+            if (layerHeight === 0.3) qualityFactor = 0.85; // Швидко
 
             finalPrice = finalPrice * qualityFactor;
-            if (finalPrice < 50) finalPrice = 50; // Мінімалка
+            if (finalPrice < 50) finalPrice = 50;
 
-            // Оновлення UI
+            // UI
             document.getElementById('price').innerText = Math.round(finalPrice);
             document.getElementById('vol').innerText = baseVolume.toFixed(1);
             document.getElementById('weight').innerText = finalWeight.toFixed(1);
 
-            // Зберігаємо для відправки
+            updateData(Math.round(finalPrice), finalWeight.toFixed(1));
+        }
+
+        function updateData(price, weight) {
+            const mat = document.getElementById('material');
             orderData = {
-                price: Math.round(finalPrice),
-                weight: finalWeight.toFixed(1),
+                price: price || document.getElementById('price').innerText,
+                weight: weight || document.getElementById('weight').innerText,
                 vol: baseVolume.toFixed(1),
-                material: matSelect.value,
-                infill: infillVal + "%",
-                quality: qualityVal + " мм",
-                color: document.getElementById('color').value
+                material: mat.value,
+                infill: document.getElementById('infill').value + '%',
+                quality: document.getElementById('quality').value + 'мм',
+                color: document.getElementById('color').value,
+                filename: selectedFile ? selectedFile.name : 'model.stl',
+                file_link: null
             };
         }
 
-        window.uploadAndClose = async function() {
+        async function uploadAndClose() {
             const btn = document.getElementById('confirm-btn');
             btn.innerText = "⏳ Завантаження...";
-            btn.className = "btn btn-main btn-loading";
-
+            
             const formData = new FormData();
             formData.append('file', selectedFile);
 
             try {
-                // Вантажимо на tmpfiles.org
+                // Використовуємо tmpfiles.org
                 const res = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: formData });
                 const json = await res.json();
-
+                
                 if (json.status === 'success') {
-                    orderData.file_link = json.data.url.replace("tmpfiles.org/", "tmpfiles.org/dl/");
-                    orderData.filename = selectedFile.name;
+                    // Конвертуємо посилання для прямого скачування
+                    orderData.file_link = json.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
                     tg.sendData(JSON.stringify(orderData));
-                } else {
-                    throw new Error("API Error");
-                }
+                } else { throw new Error('Upload failed'); }
             } catch (e) {
-                // Якщо помилка, все одно відправляємо дані (файл скинуть вручну)
-                if(confirm("Не вдалось завантажити файл. Відправити замовлення без файлу? (Ви скинете його в чат)")) {
-                    orderData.file_link = null;
+                if(confirm("Помилка хмари. Відправити розрахунок без файлу?")) {
                     tg.sendData(JSON.stringify(orderData));
                 } else {
                     btn.innerText = "❌ Спробувати ще раз";
-                    btn.className = "btn btn-main";
                 }
             }
-        };
+        }
     </script>
 </body>
 </html>
