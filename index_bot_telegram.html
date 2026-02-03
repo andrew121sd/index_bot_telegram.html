@@ -16,58 +16,47 @@
     </script>
 
     <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #e0e0e0; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background: #e0e0e0; }
         
-        /* 3D на весь екран */
         #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
         
-        /* Інтерфейс поверх 3D */
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+        #ui-layer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; 
+            pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; 
+        }
         
-        /* Верхня панель (Статистика) */
         #top-panel {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            padding: 15px;
-            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px; border-radius: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            transform: translateY(-150%); /* Сховано */
-            transition: transform 0.3s ease;
-            pointer-events: auto;
+            transform: translateY(-150%); transition: transform 0.3s ease;
+            pointer-events: auto; text-align: center;
         }
         #top-panel.visible { transform: translateY(0); }
         
-        .price-tag { font-size: 28px; font-weight: 800; color: #3390ec; text-align: center; margin-bottom: 5px; }
-        .stats-grid { display: flex; justify-content: space-around; font-size: 14px; color: #555; }
+        .price-tag { font-size: 28px; font-weight: 800; color: #3390ec; margin-bottom: 8px; }
+        .stats-grid { display: flex; justify-content: center; gap: 20px; font-size: 14px; color: #333; }
 
-        /* Нижня панель (Кнопки) */
-        #bottom-panel { pointer-events: auto; width: 100%; padding-bottom: 20px;}
+        #bottom-panel { pointer-events: auto; width: 100%; padding-bottom: 20px; }
 
         .btn {
             display: flex; justify-content: center; align-items: center;
-            width: 100%; padding: 16px; 
+            width: 100%; padding: 18px; margin-top: 10px;
             border: none; border-radius: 14px;
-            font-size: 16px; font-weight: 600; 
-            cursor: pointer; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            transition: transform 0.1s;
+            font-size: 18px; font-weight: 600; 
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        .btn:active { transform: scale(0.96); }
+        .btn:active { transform: scale(0.96); opacity: 0.9; }
 
-        /* Кнопка завантаження */
-        .btn-upload { background: #222; color: white; }
-        
-        /* Кнопка підтвердження */
+        .btn-upload { background: #333; color: white; }
         .btn-confirm { background: #3390ec; color: white; display: none; }
         
         input[type="file"] { display: none; }
-        
-        /* Лоадер */
         #loader {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.7); color: white; padding: 10px 20px; border-radius: 20px;
-            z-index: 20; display: none; pointer-events: none;
+            background: rgba(0,0,0,0.8); color: white; padding: 15px 25px; border-radius: 30px;
+            z-index: 20; display: none; font-weight: bold;
         }
     </style>
 </head>
@@ -76,7 +65,6 @@
     <div id="canvas-container"></div>
 
     <div id="ui-layer">
-        
         <div id="top-panel">
             <div class="price-tag">≈ <span id="price">0</span> грн</div>
             <div class="stats-grid">
@@ -88,8 +76,7 @@
         <div id="bottom-panel">
             <label for="file-upload" class="btn btn-upload" id="upload-btn">📂 Обрати STL/OBJ</label>
             <input type="file" id="file-upload" accept=".stl,.obj">
-            
-            <button class="btn btn-confirm" id="confirm-btn" onclick="sendOrder()">✅ Підтвердити замовлення</button>
+            <button class="btn btn-confirm" id="confirm-btn" onclick="sendOrder()">✅ Підтвердити</button>
         </div>
     </div>
 
@@ -102,7 +89,7 @@
         import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
         const tg = window.Telegram.WebApp;
-        tg.expand();
+        tg.expand(); // Розгорнути на весь екран
 
         let scene, camera, renderer, mesh, controls;
         let orderData = null;
@@ -111,46 +98,39 @@
 
         function init() {
             const container = document.getElementById('canvas-container');
-
-            // 1. Сцена
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xdcdcdc); // Світло-сірий фон
-            scene.fog = new THREE.Fog(0xdcdcdc, 10, 500);
-
-            // Сітка (підлога)
-            const grid = new THREE.GridHelper(200, 40, 0x000000, 0x000000);
-            grid.material.opacity = 0.1;
-            grid.material.transparent = true;
+            scene.background = new THREE.Color(0xeeeeee);
+            
+            // Сітка для орієнтації
+            const grid = new THREE.GridHelper(200, 40, 0xcccccc, 0xdddddd);
             scene.add(grid);
 
-            // 2. Світло
-            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+            // Світло
+            const ambient = new THREE.AmbientLight(0xffffff, 0.7);
             scene.add(ambient);
-            const spot = new THREE.SpotLight(0xffffff, 1);
-            spot.position.set(50, 80, 50);
-            spot.castShadow = true;
-            scene.add(spot);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(50, 100, 50);
+            scene.add(dirLight);
 
-            // 3. Камера
+            // Камера
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(30, 30, 30);
 
-            // 4. Рендер
+            // Рендер
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             container.appendChild(renderer.domElement);
 
-            // 5. Контроли
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.autoRotate = true;
 
-            // 🔥 ДОДАЄМО ТЕСТОВИЙ КУБ (Щоб ви бачили, що все працює)
-            const geom = new THREE.BoxGeometry(10, 10, 10);
+            // Куб для перевірки
+            const geo = new THREE.BoxGeometry(5, 5, 5);
             const mat = new THREE.MeshStandardMaterial({ color: 0x3390ec });
-            mesh = new THREE.Mesh(geom, mat);
-            mesh.position.y = 5;
+            mesh = new THREE.Mesh(geo, mat);
+            mesh.position.y = 2.5;
             scene.add(mesh);
 
             animate();
@@ -181,9 +161,7 @@
 
             reader.onload = function(event) {
                 try {
-                    // Видаляємо старий меш (або куб)
                     if (mesh) scene.remove(mesh);
-
                     const content = event.target.result;
                     
                     if (ext === 'stl') {
@@ -196,9 +174,10 @@
                         let geometry = null;
                         object.traverse(c => { if (c.isMesh) geometry = c.geometry; });
                         if (geometry) setupModel(geometry);
+                        else throw new Error("OBJ файл пустий або без геометрії");
                     }
                 } catch (err) {
-                    alert("Помилка: " + err.message);
+                    alert("Помилка читання файлу: " + err.message);
                     document.getElementById('loader').style.display = 'none';
                 }
             };
@@ -212,37 +191,26 @@
             geometry.center();
 
             const material = new THREE.MeshStandardMaterial({ 
-                color: 0xff9800, // Помаранчевий колір моделі
-                roughness: 0.4,
-                metalness: 0.1
+                color: 0xff9800, roughness: 0.5, metalness: 0.1 
             });
 
             mesh = new THREE.Mesh(geometry, material);
             mesh.rotation.x = -Math.PI / 2;
             
-            // Піднімаємо модель над сіткою
+            // Ставимо на "підлогу"
             geometry.computeBoundingBox();
-            const minY = geometry.boundingBox.min.z; // Z бо ми повернули модель
-            mesh.position.y = -minY; // Ставимо на підлогу
-
+            mesh.position.y = -geometry.boundingBox.min.z; 
             scene.add(mesh);
 
-            // Авто-зум камери
+            // Камера
             const size = geometry.boundingBox.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
             const dist = maxDim * 2.5;
-            
             camera.position.set(dist, dist, dist);
             camera.lookAt(0,0,0);
             controls.target.set(0,0,0);
 
-            calculatePrice(geometry);
-            
-            document.getElementById('loader').style.display = 'none';
-        }
-
-        function calculatePrice(geometry) {
-            // Простий розрахунок об'єму для BufferGeometry
+            // Розрахунок
             let vol = 0;
             const pos = geometry.attributes.position;
             const p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), p3 = new THREE.Vector3();
@@ -252,31 +220,49 @@
                 p3.fromBufferAttribute(pos, i + 2);
                 vol += p1.dot(p2.cross(p3)) / 6.0;
             }
-            
-            vol = Math.abs(vol) / 1000; // см3
-            const weight = vol * 1.24; // PLA
-            let price = weight * 3.5; // грн
+            vol = Math.abs(vol) / 1000;
+            const weight = vol * 1.24;
+            let price = weight * 3.5;
             if (price < 50) price = 50;
 
-            // Оновлюємо інтерфейс
+            // UI
             document.getElementById('vol').innerText = vol.toFixed(2);
             document.getElementById('weight').innerText = weight.toFixed(1);
             document.getElementById('price').innerText = Math.round(price);
-
-            // Анімація інтерфейсу
+            
             document.getElementById('top-panel').classList.add('visible');
             document.getElementById('upload-btn').style.display = 'none';
-            document.getElementById('confirm-btn').style.display = 'block';
+            document.getElementById('confirm-btn').style.display = 'block'; // ПОКАЗУЄМО КНОПКУ
+            document.getElementById('loader').style.display = 'none';
 
             orderData = { vol: vol.toFixed(2), weight: weight.toFixed(1), price: Math.round(price) };
         }
 
+        // --- ГОЛОВНА ФУНКЦІЯ ВІДПРАВКИ ---
         window.sendOrder = function() {
-            if (!orderData) return;
+            // Перевірка 1: Чи є дані?
+            if (!orderData) {
+                alert("Помилка: Немає даних для відправки!");
+                return;
+            }
+
+            // Перевірка 2: Чи бачить скрипт Телеграм?
+            if (!tg) {
+                alert("Помилка: Telegram WebApp API не знайдено!");
+                return;
+            }
+
             try {
+                // Відправляємо дані
                 tg.sendData(JSON.stringify(orderData));
+                
+                // Якщо це спрацювало, вікно має закритись.
+                // Якщо ні - покажемо повідомлення.
+                setTimeout(() => {
+                    tg.close();
+                }, 100);
             } catch (e) {
-                alert("Помилка відправки в Telegram: " + e);
+                alert("КРИТИЧНА ПОМИЛКА: " + e.message);
             }
         };
     </script>
