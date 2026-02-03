@@ -31,7 +31,6 @@
         
         #bottom-panel { pointer-events: auto; width: 100%; padding-bottom: 10px; }
         
-        /* Виправлені кнопки */
         .btn { 
             display: flex; justify-content: center; align-items: center; width: 100%; 
             padding: 14px; margin-top: 8px; border: none; border-radius: 12px; 
@@ -165,27 +164,40 @@
             btn.className = "btn btn-loading";
 
             const formData = new FormData();
-            formData.append('file', selectedFile, selectedFile.name); // Важливо: передаємо ім'я файлу
-            formData.append('expires', '1d'); 
+            formData.append('file', selectedFile);
 
             try {
-                // Використовуємо file.io з правильними параметрами
-                const response = await fetch('https://file.io', { method: 'POST', body: formData });
+                // Використовуємо tmpfiles.org (надійніший)
+                const response = await fetch('https://tmpfiles.org/api/v1/upload', { 
+                    method: 'POST', 
+                    body: formData 
+                });
                 
-                if (!response.ok) throw new Error("Сервер не відповідає");
+                if (!response.ok) throw new Error("Помилка сервера");
                 const result = await response.json();
                 
-                if (result.success) {
-                    orderData.file_link = result.link;
+                if (result.status === 'success') {
+                    // Важливо: URL для скачування відрізняється від URL перегляду
+                    // API повертає: https://tmpfiles.org/12345/file.stl
+                    // Щоб скачати треба: https://tmpfiles.org/dl/12345/file.stl
+                    let dlUrl = result.data.url.replace("tmpfiles.org/", "tmpfiles.org/dl/");
+                    
+                    orderData.file_link = dlUrl;
                     orderData.filename = selectedFile.name;
-                    tg.sendData(JSON.stringify(orderData)); // Відправляємо боту
+                    tg.sendData(JSON.stringify(orderData)); 
                 } else {
                     throw new Error("Не вдалося отримати посилання");
                 }
             } catch (e) {
-                alert("Помилка завантаження: " + e.message + "\nПеревірте інтернет або VPN.");
-                btn.innerText = "❌ Спробувати ще раз";
-                btn.className = "btn btn-confirm";
+                // ЗАПАСНИЙ ПЛАН: Якщо хмара не працює, відправляємо тільки цифри
+                // Бот попросить скинути файл вручну
+                if(confirm("Не вдалося завантажити файл у хмару. Відправити тільки розрахунок, а файл скинете в чат?")) {
+                     orderData.file_link = null; // Позначаємо, що файлу немає
+                     tg.sendData(JSON.stringify(orderData));
+                } else {
+                    btn.innerText = "❌ Спробувати ще раз";
+                    btn.className = "btn btn-confirm";
+                }
             }
         };
     </script>
