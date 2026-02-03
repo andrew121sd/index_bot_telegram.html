@@ -43,6 +43,7 @@
         .btn:active { opacity: 0.8; transform: scale(0.98); }
         .btn-main { background: #007aff; color: white; }
         .btn-sec { background: #e5e5ea; color: #007aff; }
+        .btn-loading { background: #8e8e93; color: white; pointer-events: none; }
         
         #upload-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
@@ -133,11 +134,9 @@
         // Ініціалізація
         init();
 
-        // Слухачі подій для перерахунку ціни (ВАЖЛИВО!)
-        document.getElementById('material').addEventListener('change', calculatePrice);
-        document.getElementById('infill').addEventListener('change', calculatePrice);
-        document.getElementById('quality').addEventListener('change', calculatePrice);
-        document.getElementById('color').addEventListener('change', updateData);
+        // СЛУХАЧІ ПОДІЙ (Це змушує ціну змінюватись)
+        const els = ['material', 'infill', 'quality', 'color'];
+        els.forEach(id => document.getElementById(id).addEventListener('change', calculatePrice));
         document.getElementById('confirm-btn').addEventListener('click', uploadAndClose);
 
         function init() {
@@ -179,7 +178,7 @@
                         let geo; obj.traverse(c => { if(c.isMesh) geo = c.geometry });
                         if(geo) showModel(geo);
                     }
-                } catch (err) { alert('Err: ' + err); }
+                } catch (err) { alert('Помилка: ' + err); }
                 document.getElementById('loader').style.display = 'none';
             };
             if (ext === 'stl') reader.readAsArrayBuffer(selectedFile); else reader.readAsText(selectedFile);
@@ -198,7 +197,6 @@
             
             camera.position.set(maxDim*2.5, maxDim*2.5, maxDim*2.5); camera.lookAt(0,0,0);
 
-            // Volume Calculation
             let vol = 0; const pos = geometry.attributes.position;
             const p1=new THREE.Vector3(),p2=new THREE.Vector3(),p3=new THREE.Vector3();
             for(let i=0;i<pos.count;i+=3){
@@ -219,48 +217,46 @@
             const infillEl = document.getElementById('infill');
             const qualEl = document.getElementById('quality');
 
-            // Отримуємо дані з data-attributes
+            // Отримуємо коефіцієнти
             const costPerGram = parseFloat(matEl.options[matEl.selectedIndex].dataset.cost);
             const density = parseFloat(matEl.options[matEl.selectedIndex].dataset.dens);
             const infillVal = parseInt(infillEl.value);
             const layerHeight = parseFloat(qualEl.value);
 
-            // 1. Вага (залежить від заповнення)
-            // 40% ваги - це периметри (стінки), 60% - це внутрішнє заповнення
+            // 1. Вага = Об'єм * Щільність * Коефіцієнт заповнення
+            // (Стінки ~40% об'єму, решта залежить від заповнення)
             let solidRatio = 0.4 + (0.6 * (infillVal / 100));
             if (infillVal === 0) solidRatio = 0.35; 
             if (infillVal === 100) solidRatio = 1.0;
 
             const finalWeight = baseVolume * density * solidRatio;
 
-            // 2. Ціна
+            // 2. Базова ціна = Вага * Ціна пластику
             let finalPrice = finalWeight * costPerGram;
 
-            // 3. Коефіцієнт якості (часу)
+            // 3. Коригування на швидкість друку (Якість)
             let qualityFactor = 1.0;
-            if (layerHeight === 0.1) qualityFactor = 1.5; // Довго
-            if (layerHeight === 0.3) qualityFactor = 0.85; // Швидко
+            if (layerHeight === 0.1) qualityFactor = 1.5; // Довго = Дорожче
+            if (layerHeight === 0.3) qualityFactor = 0.85; // Швидко = Дешевше
 
             finalPrice = finalPrice * qualityFactor;
-            if (finalPrice < 50) finalPrice = 50;
+            
+            // 🔥 МІНІМАЛКА (Зменшив до 20 грн для тестів)
+            if (finalPrice < 20) finalPrice = 20;
 
-            // UI
+            // Оновлюємо UI
             document.getElementById('price').innerText = Math.round(finalPrice);
             document.getElementById('vol').innerText = baseVolume.toFixed(1);
             document.getElementById('weight').innerText = finalWeight.toFixed(1);
 
-            updateData(Math.round(finalPrice), finalWeight.toFixed(1));
-        }
-
-        function updateData(price, weight) {
-            const mat = document.getElementById('material');
+            // Зберігаємо в об'єкт для відправки
             orderData = {
-                price: price || document.getElementById('price').innerText,
-                weight: weight || document.getElementById('weight').innerText,
+                price: Math.round(finalPrice),
+                weight: finalWeight.toFixed(1),
                 vol: baseVolume.toFixed(1),
-                material: mat.value,
-                infill: document.getElementById('infill').value + '%',
-                quality: document.getElementById('quality').value + 'мм',
+                material: matEl.value,
+                infill: infillEl.options[infillEl.selectedIndex].text,
+                quality: qualEl.options[qualEl.selectedIndex].text,
                 color: document.getElementById('color').value,
                 filename: selectedFile ? selectedFile.name : 'model.stl',
                 file_link: null
@@ -270,25 +266,25 @@
         async function uploadAndClose() {
             const btn = document.getElementById('confirm-btn');
             btn.innerText = "⏳ Завантаження...";
+            btn.className = "btn btn-main btn-loading";
             
             const formData = new FormData();
             formData.append('file', selectedFile);
 
             try {
-                // Використовуємо tmpfiles.org
                 const res = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: formData });
                 const json = await res.json();
                 
                 if (json.status === 'success') {
-                    // Конвертуємо посилання для прямого скачування
                     orderData.file_link = json.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
                     tg.sendData(JSON.stringify(orderData));
-                } else { throw new Error('Upload failed'); }
+                } else { throw new Error('API Error'); }
             } catch (e) {
-                if(confirm("Помилка хмари. Відправити розрахунок без файлу?")) {
+                if(confirm("Помилка хмари. Відправити тільки розрахунок?")) {
                     tg.sendData(JSON.stringify(orderData));
                 } else {
-                    btn.innerText = "❌ Спробувати ще раз";
+                    btn.innerText = "❌ Повторити";
+                    btn.className = "btn btn-main";
                 }
             }
         }
