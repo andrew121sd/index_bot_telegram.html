@@ -69,7 +69,7 @@
 
         <div class="settings-grid">
             <div class="control-group">
-                <span class="label">Матеріал</span>
+                <span class="label">Матеріал (Ціна за грам)</span>
                 <select id="material">
                     <option value="PLA" data-cost="3.5" data-dens="1.24">PLA (Еко)</option>
                     <option value="PETG" data-cost="3.5" data-dens="1.27">PETG (Міцний)</option>
@@ -131,10 +131,34 @@
         let selectedFile = null;
         let orderData = {};
 
-        // Ініціалізація
+        // 🔥 ОНОВЛЕННЯ ЦІН З URL 🔥
+        function updatePricesFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const select = document.getElementById('material');
+            
+            for (let i = 0; i < select.options.length; i++) {
+                const opt = select.options[i];
+                const matName = opt.value; // PLA, PETG...
+                
+                // Шукаємо параметр в URL (наприклад ?PLA=4.5)
+                const newPrice = urlParams.get(matName);
+                
+                if (newPrice) {
+                    opt.setAttribute('data-cost', newPrice);
+                    // Оновлюємо текст, щоб юзер бачив ціну (опціонально)
+                    // opt.text = `${matName} (${newPrice} грн/г)`;
+                }
+            }
+            console.log("Ціни оновлено з URL");
+        }
+        
+        // Запускаємо оновлення цін
+        updatePricesFromUrl();
+        
+        // Ініціалізація 3D
         init();
 
-        // СЛУХАЧІ ПОДІЙ (Це змушує ціну змінюватись)
+        // СЛУХАЧІ ПОДІЙ
         const els = ['material', 'infill', 'quality', 'color'];
         els.forEach(id => document.getElementById(id).addEventListener('change', calculatePrice));
         document.getElementById('confirm-btn').addEventListener('click', uploadAndClose);
@@ -217,39 +241,32 @@
             const infillEl = document.getElementById('infill');
             const qualEl = document.getElementById('quality');
 
-            // Отримуємо коефіцієнти
+            // Отримуємо актуальні дані (які могли бути змінені через URL)
             const costPerGram = parseFloat(matEl.options[matEl.selectedIndex].dataset.cost);
             const density = parseFloat(matEl.options[matEl.selectedIndex].dataset.dens);
             const infillVal = parseInt(infillEl.value);
             const layerHeight = parseFloat(qualEl.value);
 
-            // 1. Вага = Об'єм * Щільність * Коефіцієнт заповнення
-            // (Стінки ~40% об'єму, решта залежить від заповнення)
             let solidRatio = 0.4 + (0.6 * (infillVal / 100));
             if (infillVal === 0) solidRatio = 0.35; 
             if (infillVal === 100) solidRatio = 1.0;
 
             const finalWeight = baseVolume * density * solidRatio;
-
-            // 2. Базова ціна = Вага * Ціна пластику
             let finalPrice = finalWeight * costPerGram;
 
-            // 3. Коригування на швидкість друку (Якість)
             let qualityFactor = 1.0;
-            if (layerHeight === 0.1) qualityFactor = 1.5; // Довго = Дорожче
-            if (layerHeight === 0.3) qualityFactor = 0.85; // Швидко = Дешевше
+            if (layerHeight === 0.1) qualityFactor = 1.5;
+            if (layerHeight === 0.3) qualityFactor = 0.85;
 
             finalPrice = finalPrice * qualityFactor;
             
-            // 🔥 МІНІМАЛКА (Зменшив до 20 грн для тестів)
+            // Мінімальне замовлення
             if (finalPrice < 20) finalPrice = 20;
 
-            // Оновлюємо UI
             document.getElementById('price').innerText = Math.round(finalPrice);
             document.getElementById('vol').innerText = baseVolume.toFixed(1);
             document.getElementById('weight').innerText = finalWeight.toFixed(1);
 
-            // Зберігаємо в об'єкт для відправки
             orderData = {
                 price: Math.round(finalPrice),
                 weight: finalWeight.toFixed(1),
@@ -272,6 +289,7 @@
             formData.append('file', selectedFile);
 
             try {
+                // Використовуємо tmpfiles.org для передачі файлу
                 const res = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: formData });
                 const json = await res.json();
                 
@@ -280,7 +298,8 @@
                     tg.sendData(JSON.stringify(orderData));
                 } else { throw new Error('API Error'); }
             } catch (e) {
-                if(confirm("Помилка хмари. Відправити тільки розрахунок?")) {
+                // Якщо завантаження не вдалося, відправляємо тільки дані розрахунку
+                if(confirm("Не вдалося завантажити файл в хмару. Відправити тільки розрахунок?\n(Файл можна буде скинути в чат)")) {
                     tg.sendData(JSON.stringify(orderData));
                 } else {
                     btn.innerText = "❌ Повторити";
