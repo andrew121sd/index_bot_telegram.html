@@ -29,7 +29,8 @@
         .control-group { display: flex; flex-direction: column; }
         .label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8e8e93; margin-bottom: 4px; }
         
-        select {
+        /* Стиль для випадаючих списків та поля вводу */
+        select, input[type="number"] {
             width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #c7c7cc;
             background: #f2f2f7; font-size: 14px; font-weight: 500; appearance: none; outline: none;
         }
@@ -69,7 +70,12 @@
 
         <div class="settings-grid">
             <div class="control-group">
-                <span class="label">Матеріал (Ціна за грам)</span>
+                <span class="label">Кількість (шт)</span>
+                <input type="number" id="quantity" value="1" min="1" inputmode="numeric">
+            </div>
+
+            <div class="control-group">
+                <span class="label">Матеріал</span>
                 <select id="material">
                     <option value="PLA" data-cost="3.5" data-dens="1.24">PLA (Еко)</option>
                     <option value="PETG" data-cost="3.5" data-dens="1.27">PETG (Міцний)</option>
@@ -87,20 +93,20 @@
                 </select>
             </div>
             <div class="control-group">
+                <span class="label">Якість (Шар)</span>
+                <select id="quality">
+                    <option value="0.2">0.2 мм (Стандарт)</option>
+                    <option value="0.1">0.1 мм (Висока)</option>
+                    <option value="0.3">0.3 мм (Швидка)</option>
+                </select>
+            </div>
+            <div class="control-group">
                 <span class="label">Заповнення</span>
                 <select id="infill">
                     <option value="20">20% (Стандарт)</option>
                     <option value="50">50% (Міцний)</option>
                     <option value="100">100% (Литий)</option>
                     <option value="0">0% (Пустий)</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <span class="label">Якість</span>
-                <select id="quality">
-                    <option value="0.2">0.2 мм (Стандарт)</option>
-                    <option value="0.1">0.1 мм (Висока)</option>
-                    <option value="0.3">0.3 мм (Швидка)</option>
                 </select>
             </div>
         </div>
@@ -131,36 +137,27 @@
         let selectedFile = null;
         let orderData = {};
 
-        // 🔥 ОНОВЛЕННЯ ЦІН З URL 🔥
         function updatePricesFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
             const select = document.getElementById('material');
-            
             for (let i = 0; i < select.options.length; i++) {
                 const opt = select.options[i];
-                const matName = opt.value; // PLA, PETG...
-                
-                // Шукаємо параметр в URL (наприклад ?PLA=4.5)
+                const matName = opt.value; 
                 const newPrice = urlParams.get(matName);
-                
                 if (newPrice) {
                     opt.setAttribute('data-cost', newPrice);
-                    // Оновлюємо текст, щоб юзер бачив ціну (опціонально)
-                    // opt.text = `${matName} (${newPrice} грн/г)`;
                 }
             }
-            console.log("Ціни оновлено з URL");
         }
-        
-        // Запускаємо оновлення цін
         updatePricesFromUrl();
-        
-        // Ініціалізація 3D
         init();
 
-        // СЛУХАЧІ ПОДІЙ
-        const els = ['material', 'infill', 'quality', 'color'];
+        // 🔥 СЛУХАЧ ДЛЯ КІЛЬКОСТІ
+        const els = ['material', 'infill', 'quality', 'color', 'quantity'];
         els.forEach(id => document.getElementById(id).addEventListener('change', calculatePrice));
+        // Також оновлюємо ціну при введенні з клавіатури
+        document.getElementById('quantity').addEventListener('input', calculatePrice);
+        
         document.getElementById('confirm-btn').addEventListener('click', uploadAndClose);
 
         function init() {
@@ -240,8 +237,10 @@
             const matEl = document.getElementById('material');
             const infillEl = document.getElementById('infill');
             const qualEl = document.getElementById('quality');
+            // Отримуємо кількість
+            let quantity = parseInt(document.getElementById('quantity').value);
+            if (isNaN(quantity) || quantity < 1) quantity = 1;
 
-            // Отримуємо актуальні дані (які могли бути змінені через URL)
             const costPerGram = parseFloat(matEl.options[matEl.selectedIndex].dataset.cost);
             const density = parseFloat(matEl.options[matEl.selectedIndex].dataset.dens);
             const infillVal = parseInt(infillEl.value);
@@ -251,26 +250,29 @@
             if (infillVal === 0) solidRatio = 0.35; 
             if (infillVal === 100) solidRatio = 1.0;
 
-            const finalWeight = baseVolume * density * solidRatio;
-            let finalPrice = finalWeight * costPerGram;
+            const unitWeight = baseVolume * density * solidRatio;
+            let unitPrice = unitWeight * costPerGram;
 
             let qualityFactor = 1.0;
             if (layerHeight === 0.1) qualityFactor = 1.5;
             if (layerHeight === 0.3) qualityFactor = 0.85;
 
-            finalPrice = finalPrice * qualityFactor;
-            
-            // Мінімальне замовлення
-            if (finalPrice < 20) finalPrice = 20;
+            unitPrice = unitPrice * qualityFactor;
+            if (unitPrice < 20) unitPrice = 20; // Мінімалка за штуку
 
-            document.getElementById('price').innerText = Math.round(finalPrice);
-            document.getElementById('vol').innerText = baseVolume.toFixed(1);
-            document.getElementById('weight').innerText = finalWeight.toFixed(1);
+            // 🔥 Фінальна ціна = ціна за штуку * кількість
+            const totalPrice = unitPrice * quantity;
+            const totalWeight = unitWeight * quantity;
+
+            document.getElementById('price').innerText = Math.round(totalPrice);
+            document.getElementById('vol').innerText = (baseVolume * quantity).toFixed(1); // Загальний об'єм
+            document.getElementById('weight').innerText = totalWeight.toFixed(1);
 
             orderData = {
-                price: Math.round(finalPrice),
-                weight: finalWeight.toFixed(1),
-                vol: baseVolume.toFixed(1),
+                price: Math.round(totalPrice),
+                quantity: quantity, // Передаємо кількість
+                weight: totalWeight.toFixed(1),
+                vol: (baseVolume * quantity).toFixed(1),
                 material: matEl.value,
                 infill: infillEl.options[infillEl.selectedIndex].text,
                 quality: qualEl.options[qualEl.selectedIndex].text,
@@ -289,7 +291,6 @@
             formData.append('file', selectedFile);
 
             try {
-                // Використовуємо tmpfiles.org для передачі файлу
                 const res = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: formData });
                 const json = await res.json();
                 
@@ -298,8 +299,7 @@
                     tg.sendData(JSON.stringify(orderData));
                 } else { throw new Error('API Error'); }
             } catch (e) {
-                // Якщо завантаження не вдалося, відправляємо тільки дані розрахунку
-                if(confirm("Не вдалося завантажити файл в хмару. Відправити тільки розрахунок?\n(Файл можна буде скинути в чат)")) {
+                if(confirm("Не вдалося завантажити файл в хмару. Відправити тільки розрахунок?")) {
                     tg.sendData(JSON.stringify(orderData));
                 } else {
                     btn.innerText = "❌ Повторити";
